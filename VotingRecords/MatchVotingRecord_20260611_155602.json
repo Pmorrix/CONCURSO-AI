@@ -1,0 +1,41 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-11 15:56:02",
+        "matchEndTime": "2026-06-11 15:56:26",
+        "matchWinner": "Red Team Wins!",
+        "maxPlayers": 2,
+        "redTeam": [
+            "fqe (HumanPlayer)"
+        ],
+        "blueTeam": [
+            "fewwef (ShootBot)"
+        ]
+    },
+    "finalVotingSummary": [
+        {
+            "playerName": "fqe",
+            "targetVotes": [
+                {
+                    "targetName": "fewwef",
+                    "finalVoteCast": "Bot",
+                    "actualIdentity": "Bot",
+                    "isCorrect": true
+                }
+            ]
+        }
+    ],
+    "votingTimeline": [
+        {
+            "timestamp": "15:56:13",
+            "voterName": "fqe",
+            "targetName": "fewwef",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:56:14",
+            "voterName": "fqe",
+            "targetName": "fewwef",
+            "votedAs": "Bot"
+        }
+    ]
+}

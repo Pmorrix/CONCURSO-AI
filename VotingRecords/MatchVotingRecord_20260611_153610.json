@@ -1,0 +1,124 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-11 15:36:10",
+        "matchEndTime": "2026-06-11 15:37:40",
+        "matchWinner": "Red Team Wins!",
+        "maxPlayers": 2,
+        "redTeam": [
+            "Egg (HumanPlayer)"
+        ],
+        "blueTeam": [
+            "Man (HumanPlayer)"
+        ]
+    },
+    "finalVotingSummary": [
+        {
+            "playerName": "Egg",
+            "targetVotes": [
+                {
+                    "targetName": "Man",
+                    "finalVoteCast": "Human",
+                    "actualIdentity": "Human",
+                    "isCorrect": true
+                }
+            ]
+        },
+        {
+            "playerName": "Man",
+            "targetVotes": [
+                {
+                    "targetName": "Egg",
+                    "finalVoteCast": "Bot",
+                    "actualIdentity": "Human",
+                    "isCorrect": false
+                }
+            ]
+        }
+    ],
+    "votingTimeline": [
+        {
+            "timestamp": "15:36:22",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:23",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:25",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:26",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:31",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:36",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:36",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:37",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:37",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:38",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:38",
+            "voterName": "Man",
+            "targetName": "Egg",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:42",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "15:36:42",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "15:36:42",
+            "voterName": "Egg",
+            "targetName": "Man",
+            "votedAs": "Human"
+        }
+    ]
+}

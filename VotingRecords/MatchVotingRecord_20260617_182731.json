@@ -1,0 +1,14 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-17 18:27:31",
+        "matchEndTime": "2026-06-17 18:31:12",
+        "matchWinner": "Red Team Wins!",
+        "maxPlayers": 4,
+        "redTeam": [
+            "PEPE (HumanPlayer)"
+        ],
+        "blueTeam": []
+    },
+    "finalVotingSummary": [],
+    "votingTimeline": []
+}

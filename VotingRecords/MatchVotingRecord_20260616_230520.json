@@ -1,0 +1,14 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-16 23:05:20",
+        "matchEndTime": "2026-06-16 23:15:11",
+        "matchWinner": "Red Team Wins!",
+        "maxPlayers": 8,
+        "redTeam": [
+            "PMORRIS (HumanPlayer)"
+        ],
+        "blueTeam": []
+    },
+    "finalVotingSummary": [],
+    "votingTimeline": []
+}

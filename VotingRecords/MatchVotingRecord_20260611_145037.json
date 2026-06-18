@@ -1,0 +1,64 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-11 14:50:37",
+        "matchEndTime": "2026-06-11 14:51:52",
+        "matchWinner": "Match ended prematurely - No Winner",
+        "maxPlayers": 2,
+        "redTeam": [
+            "Player (HumanPlayer)"
+        ],
+        "blueTeam": [
+            "Host (HumanPlayer)"
+        ]
+    },
+    "finalVotingSummary": [
+        {
+            "playerName": "Host",
+            "targetVotes": [
+                {
+                    "targetName": "Player",
+                    "finalVoteCast": "Bot",
+                    "actualIdentity": "Human",
+                    "isCorrect": false
+                }
+            ]
+        },
+        {
+            "playerName": "Player",
+            "targetVotes": [
+                {
+                    "targetName": "Host",
+                    "finalVoteCast": "Bot",
+                    "actualIdentity": "Human",
+                    "isCorrect": false
+                }
+            ]
+        }
+    ],
+    "votingTimeline": [
+        {
+            "timestamp": "14:50:50",
+            "voterName": "Host",
+            "targetName": "Player",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "14:50:51",
+            "voterName": "Host",
+            "targetName": "Player",
+            "votedAs": "Bot"
+        },
+        {
+            "timestamp": "14:51:45",
+            "voterName": "Player",
+            "targetName": "Host",
+            "votedAs": "Human"
+        },
+        {
+            "timestamp": "14:51:46",
+            "voterName": "Player",
+            "targetName": "Host",
+            "votedAs": "Bot"
+        }
+    ]
+}

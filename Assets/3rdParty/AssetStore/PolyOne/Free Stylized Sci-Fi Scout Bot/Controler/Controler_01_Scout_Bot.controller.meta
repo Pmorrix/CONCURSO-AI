@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4207a382b88fec24db8a17b25758f3e2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 371626
+  packageName: Free Stylized Sci-Fi Scout Bot
+  packageVersion: 0.0.1
+  assetPath: Assets/PolyOne/Free Stylized Sci-Fi Scout Bot/Controler/Controler_01_Scout_Bot.controller
+  uploadId: 894192

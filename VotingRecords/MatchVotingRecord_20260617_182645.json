@@ -1,0 +1,14 @@
+{
+    "matchInformation": {
+        "matchStartTime": "2026-06-17 18:26:45",
+        "matchEndTime": "2026-06-17 18:27:09",
+        "matchWinner": "Match ended prematurely - No Winner",
+        "maxPlayers": 4,
+        "redTeam": [],
+        "blueTeam": [
+            "Pepe (ShootBot)"
+        ]
+    },
+    "finalVotingSummary": [],
+    "votingTimeline": []
+}
