@@ -130,6 +130,15 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float damageFlinchYaw = 5f;
         [SerializeField] private float damageFlinchPitch = 2.5f;
 
+        [Header("Damage Awareness")]
+        [SerializeField] private float damageSourceLookDuration = 1.1f;
+        [SerializeField] private float damageSourceTargetDuration = 2.2f;
+        [SerializeField] private float damageSourceReactionTime = 0.12f;
+        [SerializeField] private float damageSourceMaxDistance = 45f;
+        [SerializeField] private float damageSourceMaxLookInputPerFrame = 0.06f;
+        [SerializeField] private float damageSourceLookInputSharpness = 14f;
+        [SerializeField] private float damageSourceAimNoiseMultiplier = 0.25f;
+
         [Header("Match Variation")]
         [SerializeField] private bool varyPersonalityPerMatch = true;
         [SerializeField] private float matchVariationStrength = 0.18f;
@@ -144,8 +153,10 @@ namespace Unity.FPS.Gameplay
 
         private Actor m_Target;
         private Actor m_PreviousTarget;
+        private Actor m_DamageSourceThreat;
         private bool m_TargetIsTurret;
         private bool m_TargetIsRearThreat;
+        private bool m_TargetIsDamageSourceThreat;
         private float m_TargetVisibleSince;
         private float m_CurrentReactionTime;
         private float m_NextSenseTime;
@@ -183,6 +194,9 @@ namespace Unity.FPS.Gameplay
         private float m_DamageFlinchUntil;
         private float m_DamageFlinchYaw;
         private float m_DamageFlinchPitch;
+        private float m_DamageSourceLookUntil;
+        private float m_DamageSourceThreatUntil;
+        private Vector3 m_DamageSourceLookDirection;
         private float m_ReactionTimeMultiplier = 1f;
         private float m_AimNoiseMultiplier = 1f;
         private float m_BurstDurationMultiplier = 1f;
@@ -340,6 +354,35 @@ namespace Unity.FPS.Gameplay
             m_DamageFlinchUntil = Time.time + damageFlinchDuration;
             m_DamageFlinchYaw = Random.Range(-damageFlinchYaw, damageFlinchYaw);
             m_DamageFlinchPitch = Random.Range(-damageFlinchPitch, damageFlinchPitch);
+            RegisterDamageSource(source);
+        }
+
+        private void RegisterDamageSource(GameObject source)
+        {
+            if (source == null || m_Eye == null)
+                return;
+
+            Actor sourceActor = source.GetComponentInParent<Actor>();
+            if (sourceActor != null && (sourceActor == m_SelfActor || IsFriendlyActor(sourceActor)))
+                return;
+
+            Vector3 sourcePosition = sourceActor != null
+                ? GetTargetPoint(sourceActor)
+                : source.transform.position;
+
+            Vector3 toSource = sourcePosition - m_Eye.position;
+            if (toSource.sqrMagnitude < 0.01f || toSource.magnitude > damageSourceMaxDistance)
+                return;
+
+            m_DamageSourceLookDirection = toSource.normalized;
+            m_DamageSourceLookUntil = Time.time + damageSourceLookDuration;
+
+            if (sourceActor == null)
+                return;
+
+            m_DamageSourceThreat = sourceActor;
+            m_DamageSourceThreatUntil = Time.time + damageSourceTargetDuration;
+            m_NextSenseTime = 0f;
         }
 
         private void RandomizeMatchPersonality()
@@ -391,8 +434,10 @@ namespace Unity.FPS.Gameplay
         private void UpdateTarget()
         {
             Actor rearThreat = FindRearThreat();
-            m_Target = rearThreat != null ? rearThreat : FindVisibleTarget();
+            Actor damageThreat = FindDamageSourceThreat();
+            m_Target = rearThreat != null ? rearThreat : damageThreat != null ? damageThreat : FindVisibleTarget();
             m_TargetIsRearThreat = rearThreat != null && m_Target == rearThreat;
+            m_TargetIsDamageSourceThreat = damageThreat != null && m_Target == damageThreat;
 
             if (m_Target != m_PreviousTarget)
             {
@@ -402,7 +447,9 @@ namespace Unity.FPS.Gameplay
                 m_TargetVisibleSince = m_Target != null ? Time.time : 0f;
                 m_CurrentReactionTime = m_TargetIsRearThreat
                     ? rearThreatReactionTime
-                    : GetRandomReactionTime();
+                    : m_TargetIsDamageSourceThreat
+                        ? damageSourceReactionTime
+                        : GetRandomReactionTime();
                 m_PreviousTarget = m_Target;
                 m_TargetIsTurret = IsTurretActor(m_Target);
                 StartLookOvershootForNewTarget();
@@ -410,6 +457,22 @@ namespace Unity.FPS.Gameplay
                 if (m_TargetIsTurret)
                     m_TurretRetreatUntil = 0f;
             }
+        }
+
+        private Actor FindDamageSourceThreat()
+        {
+            if (Time.time >= m_DamageSourceThreatUntil || m_DamageSourceThreat == null || IsFriendlyActor(m_DamageSourceThreat))
+                return null;
+
+            Vector3 targetPoint = GetTargetPoint(m_DamageSourceThreat);
+            float distance = Vector3.Distance(m_Eye.position, targetPoint);
+            if (distance > damageSourceMaxDistance)
+                return null;
+
+            if (!HasLineOfSight(m_DamageSourceThreat, targetPoint, distance))
+                return null;
+
+            return m_DamageSourceThreat;
         }
 
         private void StartLookOvershootForNewTarget()
@@ -635,14 +698,18 @@ namespace Unity.FPS.Gameplay
         {
             Vector3 desiredDirection;
 
-            if (m_IsSeekingHealth)
-            {
-                desiredDirection = m_HealingDestination + Vector3.up * 1.2f - m_Eye.position;
-            }
-            else if (m_Target != null)
+            if (m_Target != null)
             {
                 Vector3 targetNoise = GetTargetAimNoise();
                 desiredDirection = GetTargetPoint(m_Target) + targetNoise - m_Eye.position;
+            }
+            else if (Time.time < m_DamageSourceLookUntil && m_DamageSourceLookDirection.sqrMagnitude > 0.01f)
+            {
+                desiredDirection = m_DamageSourceLookDirection;
+            }
+            else if (m_IsSeekingHealth)
+            {
+                desiredDirection = m_HealingDestination + Vector3.up * 1.2f - m_Eye.position;
             }
             else if (m_HasObjectiveDestination)
             {
@@ -685,6 +752,11 @@ namespace Unity.FPS.Gameplay
             {
                 lookLimit = rearThreatMaxLookInputPerFrame;
                 lookSharpness = rearThreatLookInputSharpness;
+            }
+            else if (m_TargetIsDamageSourceThreat || Time.time < m_DamageSourceLookUntil)
+            {
+                lookLimit = damageSourceMaxLookInputPerFrame;
+                lookSharpness = damageSourceLookInputSharpness;
             }
 
             Vector2 targetLookInput = new Vector2(
@@ -788,6 +860,12 @@ namespace Unity.FPS.Gameplay
             }
 
             if (m_Target != null && m_TargetIsRearThreat)
+            {
+                UpdateCombatMoveInput();
+                return;
+            }
+
+            if (m_Target != null && m_TargetIsDamageSourceThreat)
             {
                 UpdateCombatMoveInput();
                 return;
@@ -1279,6 +1357,9 @@ namespace Unity.FPS.Gameplay
 
             if (m_TargetIsRearThreat)
                 return m_AimOffset * rearThreatAimNoiseMultiplier;
+
+            if (m_TargetIsDamageSourceThreat)
+                return m_AimOffset * damageSourceAimNoiseMultiplier;
 
             if (m_Target == null || m_Eye == null)
                 return m_AimOffset;

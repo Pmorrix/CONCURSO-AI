@@ -810,6 +810,13 @@ MonoBehaviour:
   damageFlinchDuration: 0.16
   damageFlinchYaw: 5
   damageFlinchPitch: 2.5
+  damageSourceLookDuration: 1.1
+  damageSourceTargetDuration: 2.2
+  damageSourceReactionTime: 0.12
+  damageSourceMaxDistance: 45
+  damageSourceMaxLookInputPerFrame: 0.06
+  damageSourceLookInputSharpness: 14
+  damageSourceAimNoiseMultiplier: 0.25
   varyPersonalityPerMatch: 1
   matchVariationStrength: 0.18
 --- !u!1 &1997678542574552901
