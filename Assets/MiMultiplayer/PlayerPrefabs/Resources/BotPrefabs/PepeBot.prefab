@@ -723,7 +723,7 @@ MonoBehaviour:
   pauseChance: 0.1
   initialNoPauseDuration: 3
   sprintChance: 0.1
-  jumpChance: 0.12
+  jumpChance: 0.2
   obstacleCheckDistance: 2.2
   wallAvoidanceDistance: 2.4
   lowObstacleHeight: 0.45
@@ -731,7 +731,7 @@ MonoBehaviour:
   obstacleJumpDistance: 1.5
   obstacleJumpCooldown: 0.8
   sideProbeAngle: 35
-  moveInputSharpness: 6
+  moveInputSharpness: 9
   stuckCheckInterval: 0.6
   stuckMinMoveDistance: 0.35
   stuckRecoveryDuration: 1.4
@@ -752,7 +752,8 @@ MonoBehaviour:
   closeEnemyFireAngleBonus: 10
   rearThreatRadius: 12
   rearThreatAngle: 130
-  rearThreatReactionTime: 0.05
+  rearThreatDetectionChance: 0.18
+  rearThreatReactionTime: 0.4
   rearThreatAimAngleToFire: 12
   rearThreatMaxLookInputPerFrame: 0.09
   rearThreatLookInputSharpness: 20
@@ -761,6 +762,9 @@ MonoBehaviour:
   postCombatHealRatio: 0.45
   postCombatHealDuration: 8
   healthPickupScanInterval: 1
+  healthPickupDiscoveryRadius: 20
+  healthPickupDiscoveryAngle: 110
+  healthPickupNearbyAwarenessDistance: 3
   healthPickupReachDistance: 0.6
   duplicateHealthMemoryDistance: 1.5
   healthMemorySkipChance: 0.12
@@ -769,6 +773,7 @@ MonoBehaviour:
   sprintToCtfObjective: 1
   objectiveScanInterval: 0.5
   objectiveReachDistance: 1.2
+  objectiveSprintChance: 0.55
   objectiveSideLookChance: 0.45
   objectiveSideLookIntervalMin: 2
   objectiveSideLookIntervalMax: 4.5
@@ -787,7 +792,21 @@ MonoBehaviour:
   wanderPointMinDistance: 6
   wanderPointMaxDistance: 16
   wanderDestinationReachDistance: 2
-  turretReactionTime: 0.08
+  traversalStrafeChance: 0.7
+  traversalStrafeInputMin: 0.08
+  traversalStrafeInputMax: 0.22
+  traversalStrafeIntervalMin: 1.2
+  traversalStrafeIntervalMax: 3
+  traversalStrafeDurationMin: 0.45
+  traversalStrafeDurationMax: 1.25
+  traversalWallBiasChance: 0.22
+  sprintBurstDurationMin: 1.4
+  sprintBurstDurationMax: 3.2
+  impatientJumpCooldownMin: 4.5
+  impatientJumpCooldownMax: 9
+  turretReactionTime: 0.22
+  turretFirstDetectionTimeMin: 0.45
+  turretFirstDetectionTimeMax: 0.85
   turretOpeningFireTime: 3
   turretFireDistance: 38
   turretAimAngleToFire: 10
@@ -795,8 +814,8 @@ MonoBehaviour:
   turretPreferredDistance: 24
   turretRetreatDuration: 1.6
   turretPriorityBias: 12
-  turretMaxLookInputPerFrame: 0.08
-  turretLookInputSharpness: 18
+  turretMaxLookInputPerFrame: 0.018
+  turretLookInputSharpness: 10
   turretReloadAmmoRatio: 0.18
   turretResumeFireAmmoRatio: 0.55
   turretReloadRetreatDuration: 1.8
@@ -817,6 +836,11 @@ MonoBehaviour:
   damageSourceMaxLookInputPerFrame: 0.06
   damageSourceLookInputSharpness: 14
   damageSourceAimNoiseMultiplier: 0.25
+  combatEngageMovementChance: 0.7
+  combatPreferredDistanceVariation: 4
+  combatCrouchChance: 0.08
+  combatCrouchDurationMin: 0.35
+  combatCrouchDurationMax: 0.8
   varyPersonalityPerMatch: 1
   matchVariationStrength: 0.18
 --- !u!1 &1997678542574552901

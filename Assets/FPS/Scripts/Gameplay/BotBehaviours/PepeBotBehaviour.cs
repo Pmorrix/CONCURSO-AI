@@ -59,7 +59,8 @@ namespace Unity.FPS.Gameplay
         [Header("Rear Threat")]
         [SerializeField] private float rearThreatRadius = 12f;
         [SerializeField] private float rearThreatAngle = 130f;
-        [SerializeField] private float rearThreatReactionTime = 0.05f;
+        [SerializeField] private float rearThreatDetectionChance = 0.18f;
+        [SerializeField] private float rearThreatReactionTime = 0.4f;
         [SerializeField] private float rearThreatAimAngleToFire = 12f;
         [SerializeField] private float rearThreatMaxLookInputPerFrame = 0.09f;
         [SerializeField] private float rearThreatLookInputSharpness = 20f;
@@ -70,6 +71,9 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float postCombatHealRatio = 0.45f;
         [SerializeField] private float postCombatHealDuration = 8f;
         [SerializeField] private float healthPickupScanInterval = 1f;
+        [SerializeField] private float healthPickupDiscoveryRadius = 20f;
+        [SerializeField] private float healthPickupDiscoveryAngle = 110f;
+        [SerializeField] private float healthPickupNearbyAwarenessDistance = 3f;
         [SerializeField] private float healthPickupReachDistance = 0.6f;
         [SerializeField] private float duplicateHealthMemoryDistance = 1.5f;
         [SerializeField] private float healthMemorySkipChance = 0.12f;
@@ -80,6 +84,7 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private bool sprintToCtfObjective = true;
         [SerializeField] private float objectiveScanInterval = 0.5f;
         [SerializeField] private float objectiveReachDistance = 1.2f;
+        [SerializeField] private float objectiveSprintChance = 0.55f;
         [SerializeField] private float objectiveSideLookChance = 0.45f;
         [SerializeField] private float objectiveSideLookIntervalMin = 2.0f;
         [SerializeField] private float objectiveSideLookIntervalMax = 4.5f;
@@ -101,8 +106,24 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float wanderPointMaxDistance = 16f;
         [SerializeField] private float wanderDestinationReachDistance = 2f;
 
+        [Header("Traversal Humanization")]
+        [SerializeField] private float traversalStrafeChance = 0.7f;
+        [SerializeField] private float traversalStrafeInputMin = 0.08f;
+        [SerializeField] private float traversalStrafeInputMax = 0.22f;
+        [SerializeField] private float traversalStrafeIntervalMin = 1.2f;
+        [SerializeField] private float traversalStrafeIntervalMax = 3f;
+        [SerializeField] private float traversalStrafeDurationMin = 0.45f;
+        [SerializeField] private float traversalStrafeDurationMax = 1.25f;
+        [SerializeField] private float traversalWallBiasChance = 0.22f;
+        [SerializeField] private float sprintBurstDurationMin = 1.4f;
+        [SerializeField] private float sprintBurstDurationMax = 3.2f;
+        [SerializeField] private float impatientJumpCooldownMin = 4.5f;
+        [SerializeField] private float impatientJumpCooldownMax = 9f;
+
         [Header("Turret Tactics")]
-        [SerializeField] private float turretReactionTime = 0.08f;
+        [SerializeField] private float turretReactionTime = 0.22f;
+        [SerializeField] private float turretFirstDetectionTimeMin = 0.45f;
+        [SerializeField] private float turretFirstDetectionTimeMax = 0.85f;
         [SerializeField] private float turretOpeningFireTime = 3.0f;
         [SerializeField] private float turretFireDistance = 38f;
         [SerializeField] private float turretAimAngleToFire = 10f;
@@ -110,8 +131,8 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float turretPreferredDistance = 24f;
         [SerializeField] private float turretRetreatDuration = 1.6f;
         [SerializeField] private float turretPriorityBias = 12f;
-        [SerializeField] private float turretMaxLookInputPerFrame = 0.08f;
-        [SerializeField] private float turretLookInputSharpness = 18f;
+        [SerializeField] private float turretMaxLookInputPerFrame = 0.018f;
+        [SerializeField] private float turretLookInputSharpness = 10f;
         [SerializeField] private float turretReloadAmmoRatio = 0.18f;
         [SerializeField] private float turretResumeFireAmmoRatio = 0.55f;
         [SerializeField] private float turretReloadRetreatDuration = 1.8f;
@@ -139,6 +160,13 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float damageSourceLookInputSharpness = 14f;
         [SerializeField] private float damageSourceAimNoiseMultiplier = 0.25f;
 
+        [Header("Combat Variation")]
+        [SerializeField] private float combatEngageMovementChance = 0.7f;
+        [SerializeField] private float combatPreferredDistanceVariation = 4f;
+        [SerializeField] private float combatCrouchChance = 0.08f;
+        [SerializeField] private float combatCrouchDurationMin = 0.35f;
+        [SerializeField] private float combatCrouchDurationMax = 0.8f;
+
         [Header("Match Variation")]
         [SerializeField] private bool varyPersonalityPerMatch = true;
         [SerializeField] private float matchVariationStrength = 0.18f;
@@ -157,6 +185,7 @@ namespace Unity.FPS.Gameplay
         private bool m_TargetIsTurret;
         private bool m_TargetIsRearThreat;
         private bool m_TargetIsDamageSourceThreat;
+        private bool m_DamageSourceWasRear;
         private float m_TargetVisibleSince;
         private float m_CurrentReactionTime;
         private float m_NextSenseTime;
@@ -173,11 +202,19 @@ namespace Unity.FPS.Gameplay
         private float m_InitializedTime;
         private float m_NextAimNoiseTime;
         private float m_JumpHeldUntil;
+        private float m_NextImpatientJumpTime;
+        private float m_NextSprintDecisionTime;
+        private float m_TraversalStrafe;
+        private float m_TraversalStrafeUntil;
+        private float m_NextTraversalStrafeTime;
         private float m_FireBurstUntil;
         private float m_NextFireBurstTime;
         private float m_CombatStrafe;
+        private float m_CombatDistanceOffset;
+        private float m_CrouchReleaseTime;
         private float m_TurretRetreatUntil;
         private float m_TurretReloadRetreatUntil;
+        private float m_TurretAwareAt;
         private float m_NextObstacleJumpTime;
         private float m_AvoidanceSide;
         private float m_AvoidanceSideUntil;
@@ -213,6 +250,7 @@ namespace Unity.FPS.Gameplay
         private Vector3 m_ObjectiveDestination;
         private Vector3 m_LastStuckCheckPosition;
         private readonly List<Vector3> m_KnownHealthPickups = new List<Vector3>();
+        private readonly HashSet<int> m_SeenTurretIds = new HashSet<int>();
         private float m_NextStuckCheckTime;
         private float m_StuckRecoveryUntil;
         private float m_NextStuckRecoveryAllowed;
@@ -227,6 +265,8 @@ namespace Unity.FPS.Gameplay
         private bool m_JumpDown;
         private bool m_CrouchDown;
         private bool m_CrouchReleased;
+        private bool m_IsBotCrouching;
+        private bool m_EngageTargetMovement;
         private bool m_FireHeld;
         private bool m_FireHeldPrevious;
         private bool m_FireDown;
@@ -277,7 +317,7 @@ namespace Unity.FPS.Gameplay
             if (Time.time >= m_NextHealthPickupScanTime)
             {
                 m_NextHealthPickupScanTime = Time.time + healthPickupScanInterval;
-                RememberActiveHealthPickups();
+                RememberVisibleHealthPickups();
             }
 
             UpdateHealingIntent();
@@ -297,6 +337,7 @@ namespace Unity.FPS.Gameplay
                 PickNewWanderState();
             }
 
+            UpdateCrouchState();
             UpdateAimNoise();
             UpdateLookInput();
             UpdateMoveInput();
@@ -371,14 +412,24 @@ namespace Unity.FPS.Gameplay
                 : source.transform.position;
 
             Vector3 toSource = sourcePosition - m_Eye.position;
-            if (toSource.sqrMagnitude < 0.01f || toSource.magnitude > damageSourceMaxDistance)
+            float distance = toSource.magnitude;
+            if (toSource.sqrMagnitude < 0.01f || distance > damageSourceMaxDistance)
                 return;
 
             m_DamageSourceLookDirection = toSource.normalized;
             m_DamageSourceLookUntil = Time.time + damageSourceLookDuration;
+            m_DamageSourceWasRear = IsDirectionBehind(toSource);
 
             if (sourceActor == null)
                 return;
+
+            if (m_DamageSourceWasRear &&
+                (distance > rearThreatRadius || Random.value > rearThreatDetectionChance))
+            {
+                m_DamageSourceThreat = null;
+                m_DamageSourceThreatUntil = 0f;
+                return;
+            }
 
             m_DamageSourceThreat = sourceActor;
             m_DamageSourceThreatUntil = Time.time + damageSourceTargetDuration;
@@ -433,10 +484,9 @@ namespace Unity.FPS.Gameplay
 
         private void UpdateTarget()
         {
-            Actor rearThreat = FindRearThreat();
             Actor damageThreat = FindDamageSourceThreat();
-            m_Target = rearThreat != null ? rearThreat : damageThreat != null ? damageThreat : FindVisibleTarget();
-            m_TargetIsRearThreat = rearThreat != null && m_Target == rearThreat;
+            m_Target = damageThreat != null ? damageThreat : FindVisibleTarget();
+            m_TargetIsRearThreat = damageThreat != null && m_DamageSourceWasRear && m_Target == damageThreat;
             m_TargetIsDamageSourceThreat = damageThreat != null && m_Target == damageThreat;
 
             if (m_Target != m_PreviousTarget)
@@ -455,7 +505,14 @@ namespace Unity.FPS.Gameplay
                 StartLookOvershootForNewTarget();
 
                 if (m_TargetIsTurret)
+                {
+                    bool firstDetection = m_SeenTurretIds.Add(m_Target.GetInstanceID());
+                    float awarenessDelay = firstDetection
+                        ? Random.Range(turretFirstDetectionTimeMin, turretFirstDetectionTimeMax)
+                        : GetTurretReactionTime();
+                    m_TurretAwareAt = Time.time + awarenessDelay;
                     m_TurretRetreatUntil = 0f;
+                }
             }
         }
 
@@ -493,44 +550,14 @@ namespace Unity.FPS.Gameplay
             m_LookOvershootAngle = angle;
         }
 
-        private Actor FindRearThreat()
+        private bool IsDirectionBehind(Vector3 worldDirection)
         {
-            Collider[] nearbyColliders = Physics.OverlapSphere(transform.position, rearThreatRadius, sightMask, QueryTriggerInteraction.Ignore);
-            Actor bestThreat = null;
-            float bestScore = float.MaxValue;
+            Vector3 flatDirection = Vector3.ProjectOnPlane(worldDirection, Vector3.up);
+            if (flatDirection.sqrMagnitude <= 0.01f)
+                return false;
 
-            foreach (Collider nearbyCollider in nearbyColliders)
-            {
-                Actor candidate = nearbyCollider.GetComponentInParent<Actor>();
-                if (candidate == null || candidate == m_SelfActor || IsFriendlyActor(candidate))
-                    continue;
-
-                Vector3 targetPoint = GetTargetPoint(candidate);
-                Vector3 toCandidate = targetPoint - m_Eye.position;
-                float distance = toCandidate.magnitude;
-                if (distance <= 0.01f)
-                    continue;
-
-                Vector3 flatDirection = Vector3.ProjectOnPlane(toCandidate, Vector3.up);
-                if (flatDirection.sqrMagnitude <= 0.01f)
-                    continue;
-
-                float rearAngle = Vector3.Angle(-transform.forward, flatDirection.normalized);
-                if (rearAngle > rearThreatAngle * 0.5f)
-                    continue;
-
-                if (!HasLineOfSight(candidate, targetPoint, distance))
-                    continue;
-
-                float score = distance + rearAngle * 0.05f;
-                if (score < bestScore)
-                {
-                    bestScore = score;
-                    bestThreat = candidate;
-                }
-            }
-
-            return bestThreat;
+            float rearAngle = Vector3.Angle(-transform.forward, flatDirection.normalized);
+            return rearAngle <= rearThreatAngle * 0.5f;
         }
 
         private Actor FindVisibleTarget()
@@ -635,15 +662,22 @@ namespace Unity.FPS.Gameplay
                 if (m_TargetIsTurret)
                     UpdateTurretRetreatState();
 
+                m_NextSprintDecisionTime = Time.time;
                 m_IsPaused = Random.value < 0.08f;
                 m_SprintHeld = IsRetreatingFromTurret() || Random.value < sprintChance * 0.5f;
                 m_CombatStrafe = Random.Range(-0.65f, 0.65f);
+                m_CombatDistanceOffset = Random.Range(-combatPreferredDistanceVariation, combatPreferredDistanceVariation);
+                m_EngageTargetMovement = Random.value < combatEngageMovementChance;
+                TryStartCombatCrouch();
                 return;
             }
 
             bool canPause = Time.time >= m_InitializedTime + initialNoPauseDuration;
             m_IsPaused = canPause && Random.value < pauseChance;
-            m_SprintHeld = !m_IsPaused && Random.value < sprintChance;
+            float currentSprintChance = m_HasObjectiveDestination && sprintToCtfObjective
+                ? objectiveSprintChance
+                : sprintChance;
+            UpdateNavigationSprint(currentSprintChance);
 
             float turnAngle = IsObstacleAhead() ? Random.Range(75f, 135f) * RandomSign() : Random.Range(-85f, 85f);
             m_WanderWorldDirection = Quaternion.Euler(0f, turnAngle, 0f) * transform.forward;
@@ -651,17 +685,65 @@ namespace Unity.FPS.Gameplay
             m_WanderWorldDirection.Normalize();
             PickWanderDestination();
 
-            if (!m_IsPaused && Random.value < jumpChance)
+            TryStartImpatientJump();
+
+        }
+
+        private void UpdateNavigationSprint(float chance)
+        {
+            if (m_IsPaused)
             {
-                m_JumpDown = true;
-                m_JumpHeldUntil = Time.time + Random.Range(0.08f, 0.18f);
+                m_SprintHeld = false;
+                m_NextSprintDecisionTime = Time.time;
+                return;
             }
 
-            if (Random.value < 0.025f)
-            {
-                m_CrouchDown = true;
-                m_CrouchReleased = true;
-            }
+            if (Time.time < m_NextSprintDecisionTime)
+                return;
+
+            m_SprintHeld = Random.value < chance;
+            m_NextSprintDecisionTime = Time.time + (m_SprintHeld
+                ? Random.Range(sprintBurstDurationMin, sprintBurstDurationMax)
+                : Random.Range(decisionIntervalMin, decisionIntervalMax));
+        }
+
+        private void TryStartImpatientJump()
+        {
+            if (m_IsPaused || Time.time < m_NextImpatientJumpTime || Random.value >= jumpChance)
+                return;
+
+            if (m_Controller == null || !m_Controller.IsGrounded || m_OutputMoveInput.sqrMagnitude < 0.2f)
+                return;
+
+            Vector3 moveDirection = transform.TransformDirection(m_OutputMoveInput);
+            moveDirection.y = 0f;
+            if (moveDirection.sqrMagnitude < 0.01f ||
+                HasObstacle(moveDirection.normalized, lowObstacleHeight, obstacleJumpDistance, out _))
+                return;
+
+            m_JumpDown = true;
+            m_JumpHeldUntil = Time.time + Random.Range(0.08f, 0.18f);
+            m_NextImpatientJumpTime = Time.time + Random.Range(impatientJumpCooldownMin, impatientJumpCooldownMax);
+        }
+
+        private void TryStartCombatCrouch()
+        {
+            if (m_Target == null || m_TargetIsTurret || m_IsBotCrouching || Random.value > combatCrouchChance)
+                return;
+
+            m_IsBotCrouching = true;
+            m_CrouchDown = true;
+            m_CrouchReleaseTime = Time.time + Random.Range(combatCrouchDurationMin, combatCrouchDurationMax);
+            m_SprintHeld = false;
+        }
+
+        private void UpdateCrouchState()
+        {
+            if (!m_IsBotCrouching || Time.time < m_CrouchReleaseTime)
+                return;
+
+            m_IsBotCrouching = false;
+            m_CrouchReleased = true;
         }
 
         private bool IsObstacleAhead()
@@ -698,7 +780,7 @@ namespace Unity.FPS.Gameplay
         {
             Vector3 desiredDirection;
 
-            if (m_Target != null)
+            if (m_Target != null && (!m_TargetIsTurret || IsTurretAware()))
             {
                 Vector3 targetNoise = GetTargetAimNoise();
                 desiredDirection = GetTargetPoint(m_Target) + targetNoise - m_Eye.position;
@@ -709,7 +791,7 @@ namespace Unity.FPS.Gameplay
             }
             else if (m_IsSeekingHealth)
             {
-                desiredDirection = m_HealingDestination + Vector3.up * 1.2f - m_Eye.position;
+                desiredDirection = GetNavigationLookDirection(m_HealingDestination);
             }
             else if (m_HasObjectiveDestination)
             {
@@ -784,7 +866,7 @@ namespace Unity.FPS.Gameplay
 
         private Vector3 GetObjectiveLookDirection()
         {
-            Vector3 toObjective = m_ObjectiveDestination + Vector3.up * 1.2f - m_Eye.position;
+            Vector3 toObjective = GetNavigationLookDirection(m_ObjectiveDestination);
 
             if (Time.time >= m_NextObjectiveSideLookTime)
             {
@@ -807,6 +889,15 @@ namespace Unity.FPS.Gameplay
 
             Vector3 sideDirection = Quaternion.Euler(0f, m_ObjectiveSideLookAngle, 0f) * flatObjective.normalized;
             return sideDirection + Vector3.up * Mathf.Clamp(toObjective.normalized.y, -0.15f, 0.15f);
+        }
+
+        private Vector3 GetNavigationLookDirection(Vector3 destination)
+        {
+            Vector3 lookPoint = destination;
+            if (TryGetPathDirection(destination, out _))
+                lookPoint = m_CurrentPathSteeringPoint;
+
+            return lookPoint + Vector3.up * 1.2f - m_Eye.position;
         }
 
         private void UpdateFlagStateHumanReaction()
@@ -853,7 +944,7 @@ namespace Unity.FPS.Gameplay
                 return;
             }
 
-            if (m_Target != null && m_TargetIsTurret)
+            if (m_Target != null && m_TargetIsTurret && IsTurretAware())
             {
                 UpdateTurretMoveInput();
                 return;
@@ -871,8 +962,21 @@ namespace Unity.FPS.Gameplay
                 return;
             }
 
+            if (m_Target != null && !m_TargetIsTurret && m_EngageTargetMovement)
+            {
+                UpdateCombatMoveInput();
+                return;
+            }
+
             if (m_HasObjectiveDestination)
             {
+                if (m_IsPaused)
+                {
+                    m_MoveInput = Vector3.zero;
+                    m_SprintHeld = false;
+                    return;
+                }
+
                 if (Time.time < m_ObjectiveHesitationUntil)
                 {
                     m_MoveInput = Vector3.ClampMagnitude(m_ObjectiveHesitationInput, 1f);
@@ -891,7 +995,7 @@ namespace Unity.FPS.Gameplay
                 return;
             }
 
-            if (m_Target != null)
+            if (m_Target != null && !m_TargetIsTurret)
             {
                 UpdateCombatMoveInput();
                 return;
@@ -904,7 +1008,11 @@ namespace Unity.FPS.Gameplay
             if (localWander.sqrMagnitude < 0.01f)
                 localWander = Vector3.forward;
 
-            m_MoveInput = Vector3.ClampMagnitude(new Vector3(localWander.x, 0f, localWander.z), 1f);
+            Vector3 wanderInput = Vector3.ClampMagnitude(new Vector3(localWander.x, 0f, localWander.z), 1f);
+            float remainingDistance = m_HasWanderDestination
+                ? Vector3.Distance(transform.position, m_WanderDestination)
+                : wanderPointMinDistance;
+            m_MoveInput = ApplyTraversalHumanization(wanderInput, remainingDistance);
             ApplyObstacleHandling();
         }
 
@@ -915,9 +1023,12 @@ namespace Unity.FPS.Gameplay
             Vector3 localToTarget = transform.InverseTransformDirection(toTarget.normalized);
 
             float forward = 0.15f;
-            if (distance > comfortableFireDistance)
+            float preferredFireDistance = comfortableFireDistance + m_CombatDistanceOffset;
+            float closeRetreatDistance = 7f + m_CombatDistanceOffset * 0.2f;
+
+            if (distance > preferredFireDistance)
                 forward = 0.75f;
-            else if (distance < 7f)
+            else if (distance < closeRetreatDistance)
                 forward = -0.45f;
 
             Vector3 combatInput = new Vector3(
@@ -931,7 +1042,7 @@ namespace Unity.FPS.Gameplay
 
         private void UpdateWeaponTactics()
         {
-            if (!m_TargetIsTurret || m_Target == null)
+            if (!m_TargetIsTurret || m_Target == null || !IsTurretAware())
                 return;
 
             WeaponController activeWeapon = GetActiveWeapon();
@@ -973,10 +1084,9 @@ namespace Unity.FPS.Gameplay
                 float aimAngle = Vector3.Angle(m_Eye.forward, toTarget);
                 bool reacted = Time.time >= m_TargetVisibleSince + m_CurrentReactionTime;
                 bool isTurretOpening = m_TargetIsTurret && IsTurretOpeningWindow();
-                bool isTurretRetreating = m_TargetIsTurret && IsRetreatingFromTurret();
                 bool isReloadingForTurret = m_TargetIsTurret && IsReloadingOrRecoveringFromTurret();
                 if (m_TargetIsTurret)
-                    reacted = Time.time >= m_TargetVisibleSince + GetTurretReactionTime();
+                    reacted = IsTurretAware();
 
                 float fireDistance = m_TargetIsTurret ? turretFireDistance : comfortableFireDistance;
                 float fireAngle = m_TargetIsTurret ? turretAimAngleToFire : aimAngleToFire;
@@ -989,13 +1099,19 @@ namespace Unity.FPS.Gameplay
                 if (!m_TargetIsTurret && distance < 10f)
                     fireAngle += closeEnemyFireAngleBonus;
 
-                bool canFire = reacted && !isTurretRetreating && !isReloadingForTurret &&
+                bool canFire = reacted && !isReloadingForTurret &&
                                distance <= fireDistance && aimAngle <= fireAngle;
-                m_AimHeld = reacted && !isTurretRetreating && distance <= fireDistance * 1.25f && aimAngle <= aimHoldAngle;
+                m_AimHeld = reacted && distance <= fireDistance * 1.25f && aimAngle <= aimHoldAngle;
 
                 if (m_TargetIsTurret)
                 {
-                    m_FireHeld = canFire && isTurretOpening;
+                    if (canFire && !isTurretOpening && Time.time >= m_NextFireBurstTime && Time.time >= m_FireBurstUntil)
+                    {
+                        m_FireBurstUntil = Time.time + Random.Range(enemyBurstMin, enemyBurstMax) * m_BurstDurationMultiplier;
+                        m_NextFireBurstTime = m_FireBurstUntil + Random.Range(enemyBurstPauseMin, enemyBurstPauseMax) * m_BurstPauseMultiplier;
+                    }
+
+                    m_FireHeld = canFire && (isTurretOpening || Time.time < m_FireBurstUntil);
                     m_FireDown = m_FireHeld && !m_FireHeldPrevious;
                     m_FireReleased = !m_FireHeld && m_FireHeldPrevious;
                     return;
@@ -1022,7 +1138,7 @@ namespace Unity.FPS.Gameplay
             return actor != null ? actor.transform.position + Vector3.up * 1.25f : transform.position + transform.forward;
         }
 
-        private void RememberActiveHealthPickups()
+        private void RememberVisibleHealthPickups()
         {
             HealthPickup[] healthPickups = FindObjectsByType<HealthPickup>(FindObjectsSortMode.None);
 
@@ -1031,11 +1147,65 @@ namespace Unity.FPS.Gameplay
                 if (healthPickup == null || !healthPickup.gameObject.activeInHierarchy)
                     continue;
 
+                if (!CanDiscoverHealthPickup(healthPickup))
+                    continue;
+
                 if (Random.value < Mathf.Clamp01(healthMemorySkipChance * m_HealthMemoryMultiplier))
                     continue;
 
                 RememberHealthPickupPosition(healthPickup.transform.position);
             }
+        }
+
+        private bool CanDiscoverHealthPickup(HealthPickup healthPickup)
+        {
+            if (m_Eye == null)
+                return false;
+
+            Collider pickupCollider = healthPickup.GetComponentInChildren<Collider>();
+            Vector3 targetPoint = pickupCollider != null
+                ? pickupCollider.bounds.center
+                : healthPickup.transform.position + Vector3.up * 0.5f;
+
+            Vector3 toPickup = targetPoint - m_Eye.position;
+            float distance = toPickup.magnitude;
+            if (distance <= 0.01f || distance > healthPickupDiscoveryRadius)
+                return false;
+
+            bool isNearby = distance <= healthPickupNearbyAwarenessDistance;
+            if (!isNearby && Vector3.Angle(m_Eye.forward, toPickup) > healthPickupDiscoveryAngle * 0.5f)
+                return false;
+
+            RaycastHit[] hits = Physics.RaycastAll(
+                m_Eye.position,
+                toPickup.normalized,
+                distance,
+                sightMask,
+                QueryTriggerInteraction.Collide);
+
+            RaycastHit closestHit = default;
+            float closestDistance = float.MaxValue;
+
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider.transform.IsChildOf(transform))
+                    continue;
+
+                HealthPickup hitPickup = hit.collider.GetComponentInParent<HealthPickup>();
+                if (hit.collider.isTrigger && hitPickup == null)
+                    continue;
+
+                if (hit.distance < closestDistance)
+                {
+                    closestDistance = hit.distance;
+                    closestHit = hit;
+                }
+            }
+
+            if (closestDistance == float.MaxValue)
+                return true;
+
+            return closestHit.collider.GetComponentInParent<HealthPickup>() == healthPickup;
         }
 
         private void RememberHealthPickupPosition(Vector3 position)
@@ -1207,7 +1377,7 @@ namespace Unity.FPS.Gameplay
                 0f,
                 Mathf.Clamp(localToHealth.z, -1f, 1f));
 
-            m_MoveInput = Vector3.ClampMagnitude(healingInput, 1f);
+            m_MoveInput = ApplyTraversalHumanization(healingInput, toHealth.magnitude);
             ApplyObstacleHandling();
         }
 
@@ -1235,9 +1405,51 @@ namespace Unity.FPS.Gameplay
                 0f,
                 Mathf.Clamp(localToObjective.z, -1f, 1f));
 
-            m_MoveInput = Vector3.ClampMagnitude(objectiveInput, 1f);
-            m_SprintHeld = sprintToCtfObjective;
+            m_MoveInput = ApplyTraversalHumanization(objectiveInput, toObjective.magnitude);
             ApplyObstacleHandling();
+        }
+
+        private Vector3 ApplyTraversalHumanization(Vector3 baseInput, float remainingDistance)
+        {
+            UpdateTraversalStrafe();
+
+            float destinationFade = Mathf.Clamp01((remainingDistance - 1.5f) / 4f);
+            Vector3 humanizedInput = baseInput;
+            humanizedInput.x = Mathf.Clamp(
+                humanizedInput.x + m_TraversalStrafe * destinationFade,
+                -1f,
+                1f);
+
+            return Vector3.ClampMagnitude(humanizedInput, 1f);
+        }
+
+        private void UpdateTraversalStrafe()
+        {
+            if (Time.time >= m_TraversalStrafeUntil)
+                m_TraversalStrafe = 0f;
+
+            if (Time.time < m_NextTraversalStrafeTime)
+                return;
+
+            if (Random.value >= traversalStrafeChance)
+            {
+                m_NextTraversalStrafeTime = Time.time +
+                    Random.Range(traversalStrafeIntervalMin, traversalStrafeIntervalMax);
+                return;
+            }
+
+            float duration = Random.Range(traversalStrafeDurationMin, traversalStrafeDurationMax);
+            float strength = Random.Range(traversalStrafeInputMin, traversalStrafeInputMax);
+            if (Random.value < traversalWallBiasChance)
+            {
+                duration *= 1.8f;
+                strength = Mathf.Min(strength * 1.35f, 0.35f);
+            }
+
+            m_TraversalStrafe = strength * RandomSign();
+            m_TraversalStrafeUntil = Time.time + duration;
+            m_NextTraversalStrafeTime = m_TraversalStrafeUntil +
+                Random.Range(traversalStrafeIntervalMin, traversalStrafeIntervalMax);
         }
 
         private bool TryGetPathDirection(Vector3 destination, out Vector3 worldDirection)
@@ -1380,6 +1592,11 @@ namespace Unity.FPS.Gameplay
             return Mathf.Max(0.03f, turretReactionTime / m_TurretAggressionMultiplier);
         }
 
+        private bool IsTurretAware()
+        {
+            return m_TargetIsTurret && Time.time >= m_TurretAwareAt;
+        }
+
         private float GetTurretOpeningFireTime()
         {
             return turretOpeningFireTime * m_TurretAggressionMultiplier;
@@ -1397,12 +1614,12 @@ namespace Unity.FPS.Gameplay
 
         private bool IsTurretOpeningWindow()
         {
-            return m_TargetIsTurret && Time.time < m_TargetVisibleSince + GetTurretOpeningFireTime();
+            return IsTurretAware() && Time.time < m_TurretAwareAt + GetTurretOpeningFireTime();
         }
 
         private bool IsRetreatingFromTurret()
         {
-            if (!m_TargetIsTurret || m_Target == null)
+            if (!m_TargetIsTurret || m_Target == null || !IsTurretAware())
                 return false;
 
             float distance = Vector3.Distance(transform.position, GetTargetPoint(m_Target));
@@ -1432,7 +1649,7 @@ namespace Unity.FPS.Gameplay
 
         private void UpdateTurretRetreatState()
         {
-            if (!m_TargetIsTurret || m_Target == null)
+            if (!m_TargetIsTurret || m_Target == null || !IsTurretAware())
                 return;
 
             float distance = Vector3.Distance(transform.position, GetTargetPoint(m_Target));
