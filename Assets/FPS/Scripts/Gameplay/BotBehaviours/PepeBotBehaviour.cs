@@ -101,6 +101,7 @@ namespace Unity.FPS.Gameplay
         [Header("Path Steering")]
         [SerializeField] private float pathRepathInterval = 0.45f;
         [SerializeField] private float pathCornerReachDistance = 1.1f;
+        [SerializeField] private float pathCornerLookAheadDistance = 2.4f;
         [SerializeField] private float navMeshSampleDistance = 3f;
         [SerializeField] private float wanderPointMinDistance = 6f;
         [SerializeField] private float wanderPointMaxDistance = 16f;
@@ -127,9 +128,13 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float turretOpeningFireTime = 3.0f;
         [SerializeField] private float turretFireDistance = 38f;
         [SerializeField] private float turretAimAngleToFire = 10f;
+        [SerializeField] private float turretAimNoiseMultiplier = 0.18f;
         [SerializeField] private float turretSafeDistance = 32f;
         [SerializeField] private float turretPreferredDistance = 24f;
         [SerializeField] private float turretRetreatDuration = 1.6f;
+        [SerializeField] private int turretDamagePressureHitCount = 3;
+        [SerializeField] private float turretDamagePressureWindow = 2.2f;
+        [SerializeField] private float turretDamagePressureRetreatDuration = 1.35f;
         [SerializeField] private float turretPriorityBias = 12f;
         [SerializeField] private float turretMaxLookInputPerFrame = 0.018f;
         [SerializeField] private float turretLookInputSharpness = 10f;
@@ -214,7 +219,10 @@ namespace Unity.FPS.Gameplay
         private float m_CrouchReleaseTime;
         private float m_TurretRetreatUntil;
         private float m_TurretReloadRetreatUntil;
+        private float m_TurretDamagePressureWindowUntil;
+        private float m_TurretDamagePressureRetreatUntil;
         private float m_TurretAwareAt;
+        private int m_TurretDamagePressureHits;
         private float m_NextObstacleJumpTime;
         private float m_AvoidanceSide;
         private float m_AvoidanceSideUntil;
@@ -258,7 +266,9 @@ namespace Unity.FPS.Gameplay
         private float m_NextPathUpdateTime;
         private Vector3 m_LastPathDestination;
         private Vector3 m_CurrentPathSteeringPoint;
+        private Vector3 m_CurrentPathLookAheadPoint;
         private bool m_HasPathSteeringPoint;
+        private bool m_HasPathLookAheadPoint;
 
         private bool m_IsPaused;
         private bool m_SprintHeld;
@@ -396,6 +406,27 @@ namespace Unity.FPS.Gameplay
             m_DamageFlinchYaw = Random.Range(-damageFlinchYaw, damageFlinchYaw);
             m_DamageFlinchPitch = Random.Range(-damageFlinchPitch, damageFlinchPitch);
             RegisterDamageSource(source);
+            RegisterTurretDamagePressure(source);
+        }
+
+        private void RegisterTurretDamagePressure(GameObject source)
+        {
+            if (source == null || !IsTurretActor(source.GetComponentInParent<Actor>()))
+                return;
+
+            if (Time.time >= m_TurretDamagePressureWindowUntil)
+                m_TurretDamagePressureHits = 0;
+
+            m_TurretDamagePressureHits++;
+            m_TurretDamagePressureWindowUntil = Time.time + turretDamagePressureWindow;
+
+            if (m_TurretDamagePressureHits < Mathf.Max(1, turretDamagePressureHitCount))
+                return;
+
+            m_TurretDamagePressureHits = 0;
+            m_TurretDamagePressureRetreatUntil = Mathf.Max(
+                m_TurretDamagePressureRetreatUntil,
+                Time.time + turretDamagePressureRetreatDuration);
         }
 
         private void RegisterDamageSource(GameObject source)
@@ -895,7 +926,16 @@ namespace Unity.FPS.Gameplay
         {
             Vector3 lookPoint = destination;
             if (TryGetPathDirection(destination, out _))
+            {
                 lookPoint = m_CurrentPathSteeringPoint;
+
+                if (m_HasPathLookAheadPoint && pathCornerLookAheadDistance > 0.01f)
+                {
+                    float cornerDistance = Vector3.Distance(transform.position, m_CurrentPathSteeringPoint);
+                    float lookAheadBlend = 1f - Mathf.Clamp01(cornerDistance / pathCornerLookAheadDistance);
+                    lookPoint = Vector3.Lerp(m_CurrentPathSteeringPoint, m_CurrentPathLookAheadPoint, lookAheadBlend);
+                }
+            }
 
             return lookPoint + Vector3.up * 1.2f - m_Eye.position;
         }
@@ -1461,6 +1501,7 @@ namespace Unity.FPS.Gameplay
                 m_NextPathUpdateTime = Time.time + pathRepathInterval;
                 m_LastPathDestination = destination;
                 m_HasPathSteeringPoint = false;
+                m_HasPathLookAheadPoint = false;
                 NavMeshPath navPath = new NavMeshPath();
 
                 if (NavMesh.SamplePosition(destination, out NavMeshHit destinationHit, navMeshSampleDistance, NavMesh.AllAreas) &&
@@ -1478,6 +1519,12 @@ namespace Unity.FPS.Gameplay
 
                     m_CurrentPathSteeringPoint = navPath.corners[cornerIndex];
                     m_HasPathSteeringPoint = true;
+
+                    if (cornerIndex < navPath.corners.Length - 1)
+                    {
+                        m_CurrentPathLookAheadPoint = navPath.corners[cornerIndex + 1];
+                        m_HasPathLookAheadPoint = true;
+                    }
                 }
             }
 
@@ -1565,7 +1612,7 @@ namespace Unity.FPS.Gameplay
         private Vector3 GetTargetAimNoise()
         {
             if (m_TargetIsTurret)
-                return Vector3.zero;
+                return m_AimOffset * turretAimNoiseMultiplier;
 
             if (m_TargetIsRearThreat)
                 return m_AimOffset * rearThreatAimNoiseMultiplier;
@@ -1624,6 +1671,7 @@ namespace Unity.FPS.Gameplay
 
             float distance = Vector3.Distance(transform.position, GetTargetPoint(m_Target));
             return Time.time < m_TurretRetreatUntil ||
+                   Time.time < m_TurretDamagePressureRetreatUntil ||
                    IsReloadingOrRecoveringFromTurret() ||
                    (!IsTurretOpeningWindow() && distance < GetTurretSafeDistance());
         }

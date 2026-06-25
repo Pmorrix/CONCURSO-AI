@@ -738,13 +738,13 @@ MonoBehaviour:
   stuckRecoveryCooldown: 0.35
   stuckBackInput: -0.55
   stuckStrafeInput: 0.85
-  reactionTimeMin: 0.2
-  reactionTimeMax: 0.85
+  reactionTimeMin: 0.28
+  reactionTimeMax: 0.95
   comfortableFireDistance: 28.3
-  aimAngleToFire: 28.4
+  aimAngleToFire: 22
   aimAngleToAim: 38
   aimNoise: 0.6
-  focusedAimNoiseMultiplier: 0.09
+  focusedAimNoiseMultiplier: 0.28
   enemyBurstMin: 0.28
   enemyBurstMax: 0.75
   enemyBurstPauseMin: 0.18
@@ -755,8 +755,8 @@ MonoBehaviour:
   rearThreatDetectionChance: 0.18
   rearThreatReactionTime: 0.4
   rearThreatAimAngleToFire: 12
-  rearThreatMaxLookInputPerFrame: 0.09
-  rearThreatLookInputSharpness: 20
+  rearThreatMaxLookInputPerFrame: 0.04
+  rearThreatLookInputSharpness: 12
   rearThreatAimNoiseMultiplier: 0.15
   lowHealthSeekRatio: 0.3
   postCombatHealRatio: 0.45
@@ -788,6 +788,7 @@ MonoBehaviour:
   objectiveHesitationDurationMax: 0.45
   pathRepathInterval: 0.45
   pathCornerReachDistance: 1.1
+  pathCornerLookAheadDistance: 2.4
   navMeshSampleDistance: 3
   wanderPointMinDistance: 6
   wanderPointMaxDistance: 16
@@ -810,12 +811,16 @@ MonoBehaviour:
   turretOpeningFireTime: 3
   turretFireDistance: 38
   turretAimAngleToFire: 10
+  turretAimNoiseMultiplier: 0.18
   turretSafeDistance: 32
   turretPreferredDistance: 24
   turretRetreatDuration: 1.6
+  turretDamagePressureHitCount: 3
+  turretDamagePressureWindow: 2.2
+  turretDamagePressureRetreatDuration: 1.35
   turretPriorityBias: 12
-  turretMaxLookInputPerFrame: 0.018
-  turretLookInputSharpness: 10
+  turretMaxLookInputPerFrame: 0.015
+  turretLookInputSharpness: 8
   turretReloadAmmoRatio: 0.18
   turretResumeFireAmmoRatio: 0.55
   turretReloadRetreatDuration: 1.8
@@ -831,7 +836,7 @@ MonoBehaviour:
   damageFlinchPitch: 2.5
   damageSourceLookDuration: 1.1
   damageSourceTargetDuration: 2.2
-  damageSourceReactionTime: 0.12
+  damageSourceReactionTime: 0.2
   damageSourceMaxDistance: 45
   damageSourceMaxLookInputPerFrame: 0.06
   damageSourceLookInputSharpness: 14
@@ -842,7 +847,7 @@ MonoBehaviour:
   combatCrouchDurationMin: 0.35
   combatCrouchDurationMax: 0.8
   varyPersonalityPerMatch: 1
-  matchVariationStrength: 0.18
+  matchVariationStrength: 0.22
 --- !u!1 &1997678542574552901
 GameObject:
   m_ObjectHideFlags: 0
