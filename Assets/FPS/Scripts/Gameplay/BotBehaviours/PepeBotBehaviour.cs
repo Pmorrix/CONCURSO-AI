@@ -101,7 +101,11 @@ namespace Unity.FPS.Gameplay
         [Header("Path Steering")]
         [SerializeField] private float pathRepathInterval = 0.45f;
         [SerializeField] private float pathCornerReachDistance = 1.1f;
+        [SerializeField] private float pathCornerSmoothingDistance = 1.6f;
+        [SerializeField] private float pathCornerSmoothingOffset = 0.75f;
         [SerializeField] private float navMeshSampleDistance = 3f;
+        [SerializeField] private float navMeshEdgeAvoidanceDistance = 1.25f;
+        [SerializeField] private float navMeshEdgeAvoidanceStrength = 0.38f;
         [SerializeField] private float wanderPointMinDistance = 6f;
         [SerializeField] private float wanderPointMaxDistance = 16f;
         [SerializeField] private float wanderDestinationReachDistance = 2f;
@@ -1550,7 +1554,7 @@ namespace Unity.FPS.Gameplay
                         cornerIndex++;
                     }
 
-                    m_CurrentPathSteeringPoint = navPath.corners[cornerIndex];
+                    m_CurrentPathSteeringPoint = GetSmoothedPathCorner(navPath, cornerIndex, selfHit.position);
                     m_HasPathSteeringPoint = true;
                 }
             }
@@ -1562,10 +1566,49 @@ namespace Unity.FPS.Gameplay
             toCorner.y = 0f;
 
             if (toCorner.sqrMagnitude < 0.05f)
+            {
+                m_HasPathSteeringPoint = false;
                 return false;
+            }
 
             worldDirection = toCorner.normalized;
             return true;
+        }
+
+        private Vector3 GetSmoothedPathCorner(NavMeshPath navPath, int cornerIndex, Vector3 selfPosition)
+        {
+            Vector3 corner = navPath.corners[cornerIndex];
+
+            if (pathCornerSmoothingDistance <= 0f || pathCornerSmoothingOffset <= 0f)
+                return corner;
+
+            if (cornerIndex >= navPath.corners.Length - 1)
+                return corner;
+
+            if (!NavMesh.SamplePosition(corner, out NavMeshHit cornerHit, navMeshSampleDistance, NavMesh.AllAreas))
+                return corner;
+
+            if (!NavMesh.FindClosestEdge(cornerHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas))
+                return corner;
+
+            if (edgeHit.distance >= pathCornerSmoothingDistance)
+                return corner;
+
+            Vector3 awayFromEdge = cornerHit.position - edgeHit.position;
+            awayFromEdge.y = 0f;
+            if (awayFromEdge.sqrMagnitude < 0.01f)
+                return corner;
+
+            float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / pathCornerSmoothingDistance);
+            Vector3 smoothCandidate = cornerHit.position + awayFromEdge.normalized * pathCornerSmoothingOffset * edgeWeight;
+
+            if (!NavMesh.SamplePosition(smoothCandidate, out NavMeshHit smoothHit, pathCornerSmoothingOffset + 0.25f, NavMesh.AllAreas))
+                return corner;
+
+            if (NavMesh.Raycast(selfPosition, smoothHit.position, out _, NavMesh.AllAreas))
+                return corner;
+
+            return smoothHit.position;
         }
 
         private void PickWanderDestination()
@@ -1817,7 +1860,10 @@ namespace Unity.FPS.Gameplay
             }
 
             if (!wallClose && !highBlocked)
+            {
+                ApplyNavMeshEdgeAvoidance();
                 return;
+            }
 
             Vector3 leftDirection = Quaternion.Euler(0f, -sideProbeAngle, 0f) * desiredWorldDirection;
             Vector3 rightDirection = Quaternion.Euler(0f, sideProbeAngle, 0f) * desiredWorldDirection;
@@ -1839,6 +1885,41 @@ namespace Unity.FPS.Gameplay
 
             m_MoveInput = Vector3.ClampMagnitude(new Vector3(localAvoidDirection.x, 0f, localForward), 1f);
             m_SprintHeld = false;
+            ApplyNavMeshEdgeAvoidance();
+        }
+
+        private void ApplyNavMeshEdgeAvoidance()
+        {
+            if (navMeshEdgeAvoidanceDistance <= 0f || navMeshEdgeAvoidanceStrength <= 0f)
+                return;
+
+            if (!NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas))
+                return;
+
+            if (!NavMesh.FindClosestEdge(selfHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas))
+                return;
+
+            if (edgeHit.distance >= navMeshEdgeAvoidanceDistance)
+                return;
+
+            Vector3 awayFromEdge = selfHit.position - edgeHit.position;
+            awayFromEdge.y = 0f;
+            if (awayFromEdge.sqrMagnitude < 0.01f)
+                return;
+
+            Vector3 desiredWorldDirection = transform.TransformDirection(m_MoveInput);
+            desiredWorldDirection.y = 0f;
+            if (desiredWorldDirection.sqrMagnitude < 0.01f)
+                return;
+
+            float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / navMeshEdgeAvoidanceDistance);
+            Vector3 correctedWorldDirection = Vector3.Lerp(
+                desiredWorldDirection.normalized,
+                awayFromEdge.normalized,
+                edgeWeight * navMeshEdgeAvoidanceStrength);
+
+            Vector3 localCorrectedDirection = transform.InverseTransformDirection(correctedWorldDirection.normalized);
+            m_MoveInput = Vector3.ClampMagnitude(new Vector3(localCorrectedDirection.x, 0f, localCorrectedDirection.z), 1f);
         }
 
         private bool HasObstacle(Vector3 worldDirection, float height, float distance, out RaycastHit closestHit)

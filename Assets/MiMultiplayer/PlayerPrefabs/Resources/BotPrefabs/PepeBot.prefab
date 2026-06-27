@@ -788,7 +788,11 @@ MonoBehaviour:
   objectiveHesitationDurationMax: 0.45
   pathRepathInterval: 0.45
   pathCornerReachDistance: 1.1
+  pathCornerSmoothingDistance: 1.6
+  pathCornerSmoothingOffset: 0.75
   navMeshSampleDistance: 3
+  navMeshEdgeAvoidanceDistance: 1.25
+  navMeshEdgeAvoidanceStrength: 0.38
   wanderPointMinDistance: 6
   wanderPointMaxDistance: 16
   wanderDestinationReachDistance: 2
