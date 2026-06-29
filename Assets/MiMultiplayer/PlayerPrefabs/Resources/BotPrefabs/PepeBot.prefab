@@ -219,11 +219,11 @@ MonoBehaviour:
   MaxSpeedCrouchedRatio: 0.468
   MaxSpeedInAir: 10
   AccelerationSpeedInAir: 25
-  SprintSpeedModifier: 1.3
+  SprintSpeedModifier: 1.4
   KillHeight: -50
   RotationSpeed: 180
   AimingRotationMultiplier: 0.4
-  JumpForce: 9
+  JumpForce: 10
   CameraHeightRatio: 0.8
   CapsuleHeightStanding: 1.8
   CapsuleHeightCrouching: 0.9
@@ -731,7 +731,7 @@ MonoBehaviour:
   obstacleJumpDistance: 1.5
   obstacleJumpCooldown: 0.8
   sideProbeAngle: 35
-  moveInputSharpness: 9
+  moveInputSharpness: 10
   stuckCheckInterval: 0.6
   stuckMinMoveDistance: 0.35
   stuckRecoveryDuration: 1.4
@@ -788,8 +788,11 @@ MonoBehaviour:
   objectiveHesitationDurationMax: 0.45
   pathRepathInterval: 0.45
   pathCornerReachDistance: 1.1
-  pathCornerLookAheadDistance: 2.4
+  pathCornerSmoothingDistance: 1.6
+  pathCornerSmoothingOffset: 0.75
   navMeshSampleDistance: 3
+  navMeshEdgeAvoidanceDistance: 1.25
+  navMeshEdgeAvoidanceStrength: 0.38
   wanderPointMinDistance: 6
   wanderPointMaxDistance: 16
   wanderDestinationReachDistance: 2
@@ -805,27 +808,30 @@ MonoBehaviour:
   sprintBurstDurationMax: 3.2
   impatientJumpCooldownMin: 4.5
   impatientJumpCooldownMax: 9
-  turretReactionTime: 0.22
-  turretFirstDetectionTimeMin: 0.45
-  turretFirstDetectionTimeMax: 0.85
+  turretReactionTime: 0.14
+  turretFirstDetectionTimeMin: 0.25
+  turretFirstDetectionTimeMax: 0.55
   turretOpeningFireTime: 3
   turretFireDistance: 38
   turretAimAngleToFire: 10
-  turretAimNoiseMultiplier: 0.18
+  turretAimNoiseMultiplier: 0.12
   turretSafeDistance: 32
   turretPreferredDistance: 24
   turretRetreatDuration: 1.6
-  turretDamagePressureHitCount: 3
-  turretDamagePressureWindow: 2.2
-  turretDamagePressureRetreatDuration: 1.35
+  turretDamagePressureHitCount: 2
+  turretDamagePressureWindow: 1.6
+  turretDamagePressureRetreatDuration: 1.25
+  turretDamagePressureLowHealthRatio: 0.45
   turretPriorityBias: 12
-  turretMaxLookInputPerFrame: 0.015
-  turretLookInputSharpness: 8
+  turretMaxLookInputPerFrame: 0.024
+  turretLookInputSharpness: 12
   turretReloadAmmoRatio: 0.18
   turretResumeFireAmmoRatio: 0.55
   turretReloadRetreatDuration: 1.8
   maxLookInputPerFrame: 0.012
   lookInputSharpness: 5
+  navigationWallLookDistance: 1.7
+  navigationWallLookStrength: 0.5
   lookOvershootChance: 0.45
   lookOvershootAngleMin: 3
   lookOvershootAngleMax: 9
@@ -847,7 +853,7 @@ MonoBehaviour:
   combatCrouchDurationMin: 0.35
   combatCrouchDurationMax: 0.8
   varyPersonalityPerMatch: 1
-  matchVariationStrength: 0.22
+  matchVariationStrength: 0.21
 --- !u!1 &1997678542574552901
 GameObject:
   m_ObjectHideFlags: 0

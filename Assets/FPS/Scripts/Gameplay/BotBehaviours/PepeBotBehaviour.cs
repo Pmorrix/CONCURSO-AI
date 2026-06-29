@@ -101,8 +101,11 @@ namespace Unity.FPS.Gameplay
         [Header("Path Steering")]
         [SerializeField] private float pathRepathInterval = 0.45f;
         [SerializeField] private float pathCornerReachDistance = 1.1f;
-        [SerializeField] private float pathCornerLookAheadDistance = 2.4f;
+        [SerializeField] private float pathCornerSmoothingDistance = 1.6f;
+        [SerializeField] private float pathCornerSmoothingOffset = 0.75f;
         [SerializeField] private float navMeshSampleDistance = 3f;
+        [SerializeField] private float navMeshEdgeAvoidanceDistance = 1.25f;
+        [SerializeField] private float navMeshEdgeAvoidanceStrength = 0.38f;
         [SerializeField] private float wanderPointMinDistance = 6f;
         [SerializeField] private float wanderPointMaxDistance = 16f;
         [SerializeField] private float wanderDestinationReachDistance = 2f;
@@ -122,22 +125,23 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float impatientJumpCooldownMax = 9f;
 
         [Header("Turret Tactics")]
-        [SerializeField] private float turretReactionTime = 0.22f;
-        [SerializeField] private float turretFirstDetectionTimeMin = 0.45f;
-        [SerializeField] private float turretFirstDetectionTimeMax = 0.85f;
+        [SerializeField] private float turretReactionTime = 0.14f;
+        [SerializeField] private float turretFirstDetectionTimeMin = 0.25f;
+        [SerializeField] private float turretFirstDetectionTimeMax = 0.55f;
         [SerializeField] private float turretOpeningFireTime = 3.0f;
         [SerializeField] private float turretFireDistance = 38f;
         [SerializeField] private float turretAimAngleToFire = 10f;
-        [SerializeField] private float turretAimNoiseMultiplier = 0.18f;
+        [SerializeField] private float turretAimNoiseMultiplier = 0.12f;
         [SerializeField] private float turretSafeDistance = 32f;
         [SerializeField] private float turretPreferredDistance = 24f;
         [SerializeField] private float turretRetreatDuration = 1.6f;
-        [SerializeField] private int turretDamagePressureHitCount = 3;
-        [SerializeField] private float turretDamagePressureWindow = 2.2f;
-        [SerializeField] private float turretDamagePressureRetreatDuration = 1.35f;
+        [SerializeField] private int turretDamagePressureHitCount = 2;
+        [SerializeField] private float turretDamagePressureWindow = 1.6f;
+        [SerializeField] private float turretDamagePressureRetreatDuration = 1.25f;
+        [SerializeField] private float turretDamagePressureLowHealthRatio = 0.45f;
         [SerializeField] private float turretPriorityBias = 12f;
-        [SerializeField] private float turretMaxLookInputPerFrame = 0.018f;
-        [SerializeField] private float turretLookInputSharpness = 10f;
+        [SerializeField] private float turretMaxLookInputPerFrame = 0.024f;
+        [SerializeField] private float turretLookInputSharpness = 12f;
         [SerializeField] private float turretReloadAmmoRatio = 0.18f;
         [SerializeField] private float turretResumeFireAmmoRatio = 0.55f;
         [SerializeField] private float turretReloadRetreatDuration = 1.8f;
@@ -145,6 +149,8 @@ namespace Unity.FPS.Gameplay
         [Header("Look")]
         [SerializeField] private float maxLookInputPerFrame = 0.012f;
         [SerializeField] private float lookInputSharpness = 5f;
+        [SerializeField] private float navigationWallLookDistance = 1.7f;
+        [SerializeField] private float navigationWallLookStrength = 0.5f;
 
         [Header("Humanization")]
         [SerializeField] private float lookOvershootChance = 0.45f;
@@ -266,9 +272,7 @@ namespace Unity.FPS.Gameplay
         private float m_NextPathUpdateTime;
         private Vector3 m_LastPathDestination;
         private Vector3 m_CurrentPathSteeringPoint;
-        private Vector3 m_CurrentPathLookAheadPoint;
         private bool m_HasPathSteeringPoint;
-        private bool m_HasPathLookAheadPoint;
 
         private bool m_IsPaused;
         private bool m_SprintHeld;
@@ -420,10 +424,17 @@ namespace Unity.FPS.Gameplay
             m_TurretDamagePressureHits++;
             m_TurretDamagePressureWindowUntil = Time.time + turretDamagePressureWindow;
 
-            if (m_TurretDamagePressureHits < Mathf.Max(1, turretDamagePressureHitCount))
+            bool pressureByHits = m_TurretDamagePressureHits >= Mathf.Max(1, turretDamagePressureHitCount);
+            bool pressureByHealth = m_Health != null &&
+                                    m_Health.GetRatio() <= Mathf.Clamp01(turretDamagePressureLowHealthRatio);
+
+            if (!pressureByHits && !pressureByHealth)
                 return;
 
             m_TurretDamagePressureHits = 0;
+            if (Mathf.Abs(m_CombatStrafe) < 0.35f)
+                m_CombatStrafe = Random.value < 0.5f ? -0.65f : 0.65f;
+
             m_TurretDamagePressureRetreatUntil = Mathf.Max(
                 m_TurretDamagePressureRetreatUntil,
                 Time.time + turretDamagePressureRetreatDuration);
@@ -538,9 +549,11 @@ namespace Unity.FPS.Gameplay
                 if (m_TargetIsTurret)
                 {
                     bool firstDetection = m_SeenTurretIds.Add(m_Target.GetInstanceID());
-                    float awarenessDelay = firstDetection
-                        ? Random.Range(turretFirstDetectionTimeMin, turretFirstDetectionTimeMax)
-                        : GetTurretReactionTime();
+                    float awarenessDelay = m_TargetIsDamageSourceThreat
+                        ? GetTurretReactionTime()
+                        : (firstDetection
+                            ? Random.Range(turretFirstDetectionTimeMin, turretFirstDetectionTimeMax)
+                            : GetTurretReactionTime());
                     m_TurretAwareAt = Time.time + awarenessDelay;
                     m_TurretRetreatUntil = 0f;
                 }
@@ -919,25 +932,66 @@ namespace Unity.FPS.Gameplay
                 flatObjective = transform.forward;
 
             Vector3 sideDirection = Quaternion.Euler(0f, m_ObjectiveSideLookAngle, 0f) * flatObjective.normalized;
-            return sideDirection + Vector3.up * Mathf.Clamp(toObjective.normalized.y, -0.15f, 0.15f);
+            Vector3 sideLookDirection = sideDirection + Vector3.up * Mathf.Clamp(toObjective.normalized.y, -0.15f, 0.15f);
+            return ApplyNavigationWallLookBias(sideLookDirection);
         }
 
         private Vector3 GetNavigationLookDirection(Vector3 destination)
         {
             Vector3 lookPoint = destination;
             if (TryGetPathDirection(destination, out _))
-            {
                 lookPoint = m_CurrentPathSteeringPoint;
 
-                if (m_HasPathLookAheadPoint && pathCornerLookAheadDistance > 0.01f)
+            return ApplyNavigationWallLookBias(lookPoint + Vector3.up * 1.2f - m_Eye.position);
+        }
+
+        private Vector3 ApplyNavigationWallLookBias(Vector3 desiredDirection)
+        {
+            if (navigationWallLookDistance <= 0f || navigationWallLookStrength <= 0f)
+                return desiredDirection;
+
+            Vector3 flatDesired = Vector3.ProjectOnPlane(desiredDirection, Vector3.up);
+            if (flatDesired.sqrMagnitude < 0.01f)
+                return desiredDirection;
+
+            Vector3 biasedDirection = flatDesired.normalized;
+            bool hasBias = false;
+
+            if (HasObstacle(biasedDirection, highObstacleHeight, navigationWallLookDistance, out RaycastHit wallHit))
+            {
+                Vector3 awayFromWall = wallHit.normal;
+                awayFromWall.y = 0f;
+                if (awayFromWall.sqrMagnitude > 0.01f)
                 {
-                    float cornerDistance = Vector3.Distance(transform.position, m_CurrentPathSteeringPoint);
-                    float lookAheadBlend = 1f - Mathf.Clamp01(cornerDistance / pathCornerLookAheadDistance);
-                    lookPoint = Vector3.Lerp(m_CurrentPathSteeringPoint, m_CurrentPathLookAheadPoint, lookAheadBlend);
+                    biasedDirection = Vector3.Lerp(
+                        biasedDirection,
+                        awayFromWall.normalized,
+                        navigationWallLookStrength).normalized;
+                    hasBias = true;
                 }
             }
 
-            return lookPoint + Vector3.up * 1.2f - m_Eye.position;
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas) &&
+                NavMesh.FindClosestEdge(selfHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas) &&
+                edgeHit.distance < navigationWallLookDistance)
+            {
+                Vector3 awayFromEdge = selfHit.position - edgeHit.position;
+                awayFromEdge.y = 0f;
+                if (awayFromEdge.sqrMagnitude > 0.01f)
+                {
+                    float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / navigationWallLookDistance);
+                    biasedDirection = Vector3.Lerp(
+                        biasedDirection,
+                        awayFromEdge.normalized,
+                        edgeWeight * navigationWallLookStrength).normalized;
+                    hasBias = true;
+                }
+            }
+
+            if (!hasBias)
+                return desiredDirection;
+
+            return biasedDirection * flatDesired.magnitude + Vector3.up * desiredDirection.y;
         }
 
         private void UpdateFlagStateHumanReaction()
@@ -1501,7 +1555,6 @@ namespace Unity.FPS.Gameplay
                 m_NextPathUpdateTime = Time.time + pathRepathInterval;
                 m_LastPathDestination = destination;
                 m_HasPathSteeringPoint = false;
-                m_HasPathLookAheadPoint = false;
                 NavMeshPath navPath = new NavMeshPath();
 
                 if (NavMesh.SamplePosition(destination, out NavMeshHit destinationHit, navMeshSampleDistance, NavMesh.AllAreas) &&
@@ -1517,14 +1570,8 @@ namespace Unity.FPS.Gameplay
                         cornerIndex++;
                     }
 
-                    m_CurrentPathSteeringPoint = navPath.corners[cornerIndex];
+                    m_CurrentPathSteeringPoint = GetSmoothedPathCorner(navPath, cornerIndex, selfHit.position);
                     m_HasPathSteeringPoint = true;
-
-                    if (cornerIndex < navPath.corners.Length - 1)
-                    {
-                        m_CurrentPathLookAheadPoint = navPath.corners[cornerIndex + 1];
-                        m_HasPathLookAheadPoint = true;
-                    }
                 }
             }
 
@@ -1535,10 +1582,49 @@ namespace Unity.FPS.Gameplay
             toCorner.y = 0f;
 
             if (toCorner.sqrMagnitude < 0.05f)
+            {
+                m_HasPathSteeringPoint = false;
                 return false;
+            }
 
             worldDirection = toCorner.normalized;
             return true;
+        }
+
+        private Vector3 GetSmoothedPathCorner(NavMeshPath navPath, int cornerIndex, Vector3 selfPosition)
+        {
+            Vector3 corner = navPath.corners[cornerIndex];
+
+            if (pathCornerSmoothingDistance <= 0f || pathCornerSmoothingOffset <= 0f)
+                return corner;
+
+            if (cornerIndex >= navPath.corners.Length - 1)
+                return corner;
+
+            if (!NavMesh.SamplePosition(corner, out NavMeshHit cornerHit, navMeshSampleDistance, NavMesh.AllAreas))
+                return corner;
+
+            if (!NavMesh.FindClosestEdge(cornerHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas))
+                return corner;
+
+            if (edgeHit.distance >= pathCornerSmoothingDistance)
+                return corner;
+
+            Vector3 awayFromEdge = cornerHit.position - edgeHit.position;
+            awayFromEdge.y = 0f;
+            if (awayFromEdge.sqrMagnitude < 0.01f)
+                return corner;
+
+            float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / pathCornerSmoothingDistance);
+            Vector3 smoothCandidate = cornerHit.position + awayFromEdge.normalized * pathCornerSmoothingOffset * edgeWeight;
+
+            if (!NavMesh.SamplePosition(smoothCandidate, out NavMeshHit smoothHit, pathCornerSmoothingOffset + 0.25f, NavMesh.AllAreas))
+                return corner;
+
+            if (NavMesh.Raycast(selfPosition, smoothHit.position, out _, NavMesh.AllAreas))
+                return corner;
+
+            return smoothHit.position;
         }
 
         private void PickWanderDestination()
@@ -1671,9 +1757,14 @@ namespace Unity.FPS.Gameplay
 
             float distance = Vector3.Distance(transform.position, GetTargetPoint(m_Target));
             return Time.time < m_TurretRetreatUntil ||
-                   Time.time < m_TurretDamagePressureRetreatUntil ||
+                   IsUnderTurretDamagePressure() ||
                    IsReloadingOrRecoveringFromTurret() ||
                    (!IsTurretOpeningWindow() && distance < GetTurretSafeDistance());
+        }
+
+        private bool IsUnderTurretDamagePressure()
+        {
+            return m_TargetIsTurret && Time.time < m_TurretDamagePressureRetreatUntil;
         }
 
         private bool IsReloadingOrRecoveringFromTurret()
@@ -1723,10 +1814,25 @@ namespace Unity.FPS.Gameplay
             {
                 Vector3 awayFromTurret = -toTarget.normalized;
                 Vector3 localAway = transform.InverseTransformDirection(awayFromTurret);
+                bool pressureRetreat = IsUnderTurretDamagePressure();
+                float strafeDirection = Mathf.Abs(m_CombatStrafe) > 0.05f
+                    ? Mathf.Sign(m_CombatStrafe)
+                    : Mathf.Sign(localAway.x);
+                if (Mathf.Abs(strafeDirection) < 0.5f)
+                    strafeDirection = 1f;
+
+                float retreatX = localAway.x + m_CombatStrafe * (pressureRetreat ? 0.85f : 0.35f);
+                float retreatZ = localAway.z;
+                if (pressureRetreat)
+                {
+                    retreatX += strafeDirection * 0.45f;
+                    retreatZ = Mathf.Clamp(retreatZ, -0.55f, 0.6f);
+                }
+
                 Vector3 retreatInput = new Vector3(
-                    Mathf.Clamp(localAway.x + m_CombatStrafe * 0.35f, -1f, 1f),
+                    Mathf.Clamp(retreatX, -1f, 1f),
                     0f,
-                    Mathf.Clamp(localAway.z, -1f, 1f));
+                    Mathf.Clamp(retreatZ, -1f, 1f));
 
                 m_MoveInput = Vector3.ClampMagnitude(retreatInput, 1f);
                 m_SprintHeld = true;
@@ -1770,7 +1876,10 @@ namespace Unity.FPS.Gameplay
             }
 
             if (!wallClose && !highBlocked)
+            {
+                ApplyNavMeshEdgeAvoidance();
                 return;
+            }
 
             Vector3 leftDirection = Quaternion.Euler(0f, -sideProbeAngle, 0f) * desiredWorldDirection;
             Vector3 rightDirection = Quaternion.Euler(0f, sideProbeAngle, 0f) * desiredWorldDirection;
@@ -1792,6 +1901,41 @@ namespace Unity.FPS.Gameplay
 
             m_MoveInput = Vector3.ClampMagnitude(new Vector3(localAvoidDirection.x, 0f, localForward), 1f);
             m_SprintHeld = false;
+            ApplyNavMeshEdgeAvoidance();
+        }
+
+        private void ApplyNavMeshEdgeAvoidance()
+        {
+            if (navMeshEdgeAvoidanceDistance <= 0f || navMeshEdgeAvoidanceStrength <= 0f)
+                return;
+
+            if (!NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas))
+                return;
+
+            if (!NavMesh.FindClosestEdge(selfHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas))
+                return;
+
+            if (edgeHit.distance >= navMeshEdgeAvoidanceDistance)
+                return;
+
+            Vector3 awayFromEdge = selfHit.position - edgeHit.position;
+            awayFromEdge.y = 0f;
+            if (awayFromEdge.sqrMagnitude < 0.01f)
+                return;
+
+            Vector3 desiredWorldDirection = transform.TransformDirection(m_MoveInput);
+            desiredWorldDirection.y = 0f;
+            if (desiredWorldDirection.sqrMagnitude < 0.01f)
+                return;
+
+            float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / navMeshEdgeAvoidanceDistance);
+            Vector3 correctedWorldDirection = Vector3.Lerp(
+                desiredWorldDirection.normalized,
+                awayFromEdge.normalized,
+                edgeWeight * navMeshEdgeAvoidanceStrength);
+
+            Vector3 localCorrectedDirection = transform.InverseTransformDirection(correctedWorldDirection.normalized);
+            m_MoveInput = Vector3.ClampMagnitude(new Vector3(localCorrectedDirection.x, 0f, localCorrectedDirection.z), 1f);
         }
 
         private bool HasObstacle(Vector3 worldDirection, float height, float distance, out RaycastHit closestHit)
