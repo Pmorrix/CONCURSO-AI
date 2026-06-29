@@ -808,9 +808,9 @@ MonoBehaviour:
   sprintBurstDurationMax: 3.2
   impatientJumpCooldownMin: 4.5
   impatientJumpCooldownMax: 9
-  turretReactionTime: 0.22
-  turretFirstDetectionTimeMin: 0.43
-  turretFirstDetectionTimeMax: 0.85
+  turretReactionTime: 0.14
+  turretFirstDetectionTimeMin: 0.25
+  turretFirstDetectionTimeMax: 0.55
   turretOpeningFireTime: 3
   turretFireDistance: 38
   turretAimAngleToFire: 10
@@ -823,13 +823,15 @@ MonoBehaviour:
   turretDamagePressureRetreatDuration: 1.25
   turretDamagePressureLowHealthRatio: 0.42
   turretPriorityBias: 12
-  turretMaxLookInputPerFrame: 0.015
-  turretLookInputSharpness: 8
+  turretMaxLookInputPerFrame: 0.024
+  turretLookInputSharpness: 12
   turretReloadAmmoRatio: 0.18
   turretResumeFireAmmoRatio: 0.55
   turretReloadRetreatDuration: 1.8
   maxLookInputPerFrame: 0.012
   lookInputSharpness: 5
+  navigationWallLookDistance: 1.7
+  navigationWallLookStrength: 0.5
   lookOvershootChance: 0.45
   lookOvershootAngleMin: 3
   lookOvershootAngleMax: 9

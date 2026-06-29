@@ -125,9 +125,9 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float impatientJumpCooldownMax = 9f;
 
         [Header("Turret Tactics")]
-        [SerializeField] private float turretReactionTime = 0.22f;
-        [SerializeField] private float turretFirstDetectionTimeMin = 0.45f;
-        [SerializeField] private float turretFirstDetectionTimeMax = 0.85f;
+        [SerializeField] private float turretReactionTime = 0.14f;
+        [SerializeField] private float turretFirstDetectionTimeMin = 0.25f;
+        [SerializeField] private float turretFirstDetectionTimeMax = 0.55f;
         [SerializeField] private float turretOpeningFireTime = 3.0f;
         [SerializeField] private float turretFireDistance = 38f;
         [SerializeField] private float turretAimAngleToFire = 10f;
@@ -140,8 +140,8 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float turretDamagePressureRetreatDuration = 1.25f;
         [SerializeField] private float turretDamagePressureLowHealthRatio = 0.42f;
         [SerializeField] private float turretPriorityBias = 12f;
-        [SerializeField] private float turretMaxLookInputPerFrame = 0.018f;
-        [SerializeField] private float turretLookInputSharpness = 10f;
+        [SerializeField] private float turretMaxLookInputPerFrame = 0.024f;
+        [SerializeField] private float turretLookInputSharpness = 12f;
         [SerializeField] private float turretReloadAmmoRatio = 0.18f;
         [SerializeField] private float turretResumeFireAmmoRatio = 0.55f;
         [SerializeField] private float turretReloadRetreatDuration = 1.8f;
@@ -149,6 +149,8 @@ namespace Unity.FPS.Gameplay
         [Header("Look")]
         [SerializeField] private float maxLookInputPerFrame = 0.012f;
         [SerializeField] private float lookInputSharpness = 5f;
+        [SerializeField] private float navigationWallLookDistance = 1.7f;
+        [SerializeField] private float navigationWallLookStrength = 0.5f;
 
         [Header("Humanization")]
         [SerializeField] private float lookOvershootChance = 0.45f;
@@ -585,9 +587,11 @@ namespace Unity.FPS.Gameplay
                 if (m_TargetIsTurret)
                 {
                     bool firstDetection = m_SeenTurretIds.Add(m_Target.GetInstanceID());
-                    float awarenessDelay = firstDetection
-                        ? Random.Range(turretFirstDetectionTimeMin, turretFirstDetectionTimeMax)
-                        : GetTurretReactionTime();
+                    float awarenessDelay = m_TargetIsDamageSourceThreat
+                        ? GetTurretReactionTime()
+                        : (firstDetection
+                            ? Random.Range(turretFirstDetectionTimeMin, turretFirstDetectionTimeMax)
+                            : GetTurretReactionTime());
                     m_TurretAwareAt = Time.time + awarenessDelay;
                     m_TurretRetreatUntil = 0f;
                 }
@@ -966,7 +970,8 @@ namespace Unity.FPS.Gameplay
                 flatObjective = transform.forward;
 
             Vector3 sideDirection = Quaternion.Euler(0f, m_ObjectiveSideLookAngle, 0f) * flatObjective.normalized;
-            return sideDirection + Vector3.up * Mathf.Clamp(toObjective.normalized.y, -0.15f, 0.15f);
+            Vector3 sideLookDirection = sideDirection + Vector3.up * Mathf.Clamp(toObjective.normalized.y, -0.15f, 0.15f);
+            return ApplyNavigationWallLookBias(sideLookDirection);
         }
 
         private Vector3 GetNavigationLookDirection(Vector3 destination)
@@ -975,7 +980,56 @@ namespace Unity.FPS.Gameplay
             if (TryGetPathDirection(destination, out _))
                 lookPoint = m_CurrentPathSteeringPoint;
 
-            return lookPoint + Vector3.up * 1.2f - m_Eye.position;
+            return ApplyNavigationWallLookBias(lookPoint + Vector3.up * 1.2f - m_Eye.position);
+        }
+
+        private Vector3 ApplyNavigationWallLookBias(Vector3 desiredDirection)
+        {
+            if (navigationWallLookDistance <= 0f || navigationWallLookStrength <= 0f)
+                return desiredDirection;
+
+            Vector3 flatDesired = Vector3.ProjectOnPlane(desiredDirection, Vector3.up);
+            if (flatDesired.sqrMagnitude < 0.01f)
+                return desiredDirection;
+
+            Vector3 biasedDirection = flatDesired.normalized;
+            bool hasBias = false;
+
+            if (HasObstacle(biasedDirection, highObstacleHeight, navigationWallLookDistance, out RaycastHit wallHit))
+            {
+                Vector3 awayFromWall = wallHit.normal;
+                awayFromWall.y = 0f;
+                if (awayFromWall.sqrMagnitude > 0.01f)
+                {
+                    biasedDirection = Vector3.Lerp(
+                        biasedDirection,
+                        awayFromWall.normalized,
+                        navigationWallLookStrength).normalized;
+                    hasBias = true;
+                }
+            }
+
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit selfHit, navMeshSampleDistance, NavMesh.AllAreas) &&
+                NavMesh.FindClosestEdge(selfHit.position, out NavMeshHit edgeHit, NavMesh.AllAreas) &&
+                edgeHit.distance < navigationWallLookDistance)
+            {
+                Vector3 awayFromEdge = selfHit.position - edgeHit.position;
+                awayFromEdge.y = 0f;
+                if (awayFromEdge.sqrMagnitude > 0.01f)
+                {
+                    float edgeWeight = 1f - Mathf.Clamp01(edgeHit.distance / navigationWallLookDistance);
+                    biasedDirection = Vector3.Lerp(
+                        biasedDirection,
+                        awayFromEdge.normalized,
+                        edgeWeight * navigationWallLookStrength).normalized;
+                    hasBias = true;
+                }
+            }
+
+            if (!hasBias)
+                return desiredDirection;
+
+            return biasedDirection * flatDesired.magnitude + Vector3.up * desiredDirection.y;
         }
 
         private void UpdateFlagStateHumanReaction()
