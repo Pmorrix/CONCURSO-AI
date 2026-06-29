@@ -820,8 +820,8 @@ MonoBehaviour:
   turretRetreatDuration: 1.6
   turretDamagePressureHitCount: 2
   turretDamagePressureWindow: 1.6
-  turretDamagePressureRetreatDuration: 1.25
-  turretDamagePressureLowHealthRatio: 0.45
+  turretDamagePressureRetreatDuration: 1.45
+  turretDamagePressureLowHealthRatio: 0.6
   turretPriorityBias: 12
   turretMaxLookInputPerFrame: 0.024
   turretLookInputSharpness: 12

@@ -137,8 +137,8 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float turretRetreatDuration = 1.6f;
         [SerializeField] private int turretDamagePressureHitCount = 2;
         [SerializeField] private float turretDamagePressureWindow = 1.6f;
-        [SerializeField] private float turretDamagePressureRetreatDuration = 1.25f;
-        [SerializeField] private float turretDamagePressureLowHealthRatio = 0.45f;
+        [SerializeField] private float turretDamagePressureRetreatDuration = 1.45f;
+        [SerializeField] private float turretDamagePressureLowHealthRatio = 0.6f;
         [SerializeField] private float turretPriorityBias = 12f;
         [SerializeField] private float turretMaxLookInputPerFrame = 0.024f;
         [SerializeField] private float turretLookInputSharpness = 12f;
@@ -1826,7 +1826,7 @@ namespace Unity.FPS.Gameplay
                 if (pressureRetreat)
                 {
                     retreatX += strafeDirection * 0.45f;
-                    retreatZ = Mathf.Clamp(retreatZ, -0.55f, 0.6f);
+                    retreatZ = Mathf.Clamp(retreatZ, -0.75f, 0.35f);
                 }
 
                 Vector3 retreatInput = new Vector3(
