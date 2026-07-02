@@ -161,6 +161,14 @@ namespace Unity.FPS.Gameplay
         [SerializeField] private float damageFlinchDuration = 0.16f;
         [SerializeField] private float damageFlinchYaw = 5f;
         [SerializeField] private float damageFlinchPitch = 2.5f;
+        [SerializeField] private float contextPauseDamageThreshold = 12f;
+        [SerializeField] private float contextPauseDamageChance = 0.55f;
+        [SerializeField] private float contextPauseDamageCooldown = 1.1f;
+        [SerializeField] private float contextPauseDamageDurationMin = 0.12f;
+        [SerializeField] private float contextPauseDamageDurationMax = 0.28f;
+        [SerializeField] private float contextPauseFlagDurationMin = 0.18f;
+        [SerializeField] private float contextPauseFlagDurationMax = 0.42f;
+        [SerializeField] private float contextPauseStrafeInput = 0.18f;
 
         [Header("Damage Awareness")]
         [SerializeField] private float damageSourceLookDuration = 1.1f;
@@ -248,6 +256,11 @@ namespace Unity.FPS.Gameplay
         private float m_DamageSourceLookUntil;
         private float m_DamageSourceThreatUntil;
         private Vector3 m_DamageSourceLookDirection;
+        private float m_ContextPauseUntil;
+        private float m_ContextPauseLookUntil;
+        private float m_NextContextDamagePauseTime;
+        private Vector3 m_ContextPauseInput;
+        private Vector3 m_ContextPauseLookDirection;
         private float m_ReactionTimeMultiplier = 1f;
         private float m_AimNoiseMultiplier = 1f;
         private float m_BurstDurationMultiplier = 1f;
@@ -411,6 +424,36 @@ namespace Unity.FPS.Gameplay
             m_DamageFlinchPitch = Random.Range(-damageFlinchPitch, damageFlinchPitch);
             RegisterDamageSource(source);
             RegisterTurretDamagePressure(source);
+            TryStartDamageContextPause(damage);
+        }
+
+        private void TryStartDamageContextPause(float damage)
+        {
+            if (Time.time < m_NextContextDamagePauseTime)
+                return;
+
+            bool lowHealth = m_Health != null &&
+                             m_Health.GetRatio() <= Mathf.Clamp01(turretDamagePressureLowHealthRatio);
+            if (damage < contextPauseDamageThreshold && !lowHealth)
+                return;
+
+            if (Random.value > Mathf.Clamp01(contextPauseDamageChance))
+                return;
+
+            Vector3 lookDirection = m_DamageSourceLookDirection.sqrMagnitude > 0.01f
+                ? m_DamageSourceLookDirection
+                : transform.forward;
+            Vector3 pauseInput = new Vector3(
+                contextPauseStrafeInput * RandomSign(),
+                0f,
+                -contextPauseStrafeInput * 0.55f);
+
+            StartContextPause(
+                contextPauseDamageDurationMin,
+                contextPauseDamageDurationMax,
+                lookDirection,
+                pauseInput);
+            m_NextContextDamagePauseTime = Time.time + Mathf.Max(0.1f, contextPauseDamageCooldown);
         }
 
         private void RegisterTurretDamagePressure(GameObject source)
@@ -824,7 +867,11 @@ namespace Unity.FPS.Gameplay
         {
             Vector3 desiredDirection;
 
-            if (m_Target != null && (!m_TargetIsTurret || IsTurretAware()))
+            if (Time.time < m_ContextPauseLookUntil && m_ContextPauseLookDirection.sqrMagnitude > 0.01f)
+            {
+                desiredDirection = m_ContextPauseLookDirection;
+            }
+            else if (m_Target != null && (!m_TargetIsTurret || IsTurretAware()))
             {
                 Vector3 targetNoise = GetTargetAimNoise();
                 desiredDirection = GetTargetPoint(m_Target) + targetNoise - m_Eye.position;
@@ -1005,6 +1052,43 @@ namespace Unity.FPS.Gameplay
             m_ObjectiveSideLookAngle = Random.Range(55f, 105f) * RandomSign();
             m_ObjectiveHesitationUntil = Time.time + Random.Range(0.12f, 0.3f);
             m_ObjectiveHesitationInput = new Vector3(Random.Range(-0.35f, 0.35f), 0f, Random.Range(-0.1f, 0.2f));
+
+            Vector3 flatForward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (flatForward.sqrMagnitude < 0.01f)
+                flatForward = Vector3.forward;
+
+            Vector3 checkDirection = Quaternion.Euler(0f, Random.Range(65f, 110f) * RandomSign(), 0f) *
+                                     flatForward.normalized;
+            checkDirection += Vector3.up * Random.Range(-0.04f, 0.06f);
+            Vector3 pauseInput = new Vector3(
+                Random.Range(-contextPauseStrafeInput, contextPauseStrafeInput),
+                0f,
+                Random.Range(-0.08f, 0.12f));
+
+            StartContextPause(
+                contextPauseFlagDurationMin,
+                contextPauseFlagDurationMax,
+                checkDirection,
+                pauseInput);
+        }
+
+        private void StartContextPause(float durationMin, float durationMax, Vector3 lookDirection, Vector3 moveInput)
+        {
+            float minDuration = Mathf.Max(0f, durationMin);
+            float maxDuration = Mathf.Max(minDuration, durationMax);
+            float duration = Random.Range(minDuration, maxDuration);
+            if (duration <= 0.01f)
+                return;
+
+            float pauseUntil = Time.time + duration;
+            m_ContextPauseUntil = Mathf.Max(m_ContextPauseUntil, pauseUntil);
+            m_ContextPauseInput = Vector3.ClampMagnitude(moveInput, 1f);
+
+            if (lookDirection.sqrMagnitude < 0.01f)
+                return;
+
+            m_ContextPauseLookDirection = lookDirection.normalized;
+            m_ContextPauseLookUntil = Mathf.Max(m_ContextPauseLookUntil, pauseUntil + 0.18f);
         }
 
         private void UpdateObjectiveHesitation()
@@ -1032,6 +1116,15 @@ namespace Unity.FPS.Gameplay
 
         private void UpdateMoveInput()
         {
+            if (Time.time < m_ContextPauseUntil)
+            {
+                m_MoveInput = m_ContextPauseInput;
+                m_SprintHeld = false;
+                if (m_MoveInput.sqrMagnitude > 0.05f)
+                    ApplyObstacleHandling();
+                return;
+            }
+
             if (m_IsSeekingHealth)
             {
                 UpdateHealingMoveInput();

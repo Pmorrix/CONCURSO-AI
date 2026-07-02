@@ -840,6 +840,14 @@ MonoBehaviour:
   damageFlinchDuration: 0.16
   damageFlinchYaw: 5
   damageFlinchPitch: 2.5
+  contextPauseDamageThreshold: 12
+  contextPauseDamageChance: 0.55
+  contextPauseDamageCooldown: 1.1
+  contextPauseDamageDurationMin: 0.12
+  contextPauseDamageDurationMax: 0.28
+  contextPauseFlagDurationMin: 0.18
+  contextPauseFlagDurationMax: 0.42
+  contextPauseStrafeInput: 0.18
   damageSourceLookDuration: 1.1
   damageSourceTargetDuration: 2.2
   damageSourceReactionTime: 0.2
